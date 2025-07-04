@@ -5,63 +5,63 @@
 #include "ShapeMatch.h"
 //#include <time.h>
 
-void DrawContours(IplImage* source, CvPoint Result, CvPoint* Contours, int ContoursSize, CvScalar color, int lineWidth)
+void DrawContours(cv::Mat& source, cv::Point Result, CvPoint* Contours, int ContoursSize, cv::Scalar color, int lineWidth)
 {
-	CvPoint point;
-	int x = Result.x;
-	int y = Result.y;
-	cvLine(source, cvPoint(x , y-5), cvPoint(x, y+5),CV_RGB( 0, 0, 255 ),lineWidth);
-	cvLine(source, cvPoint(x-5 , y), cvPoint(x+5, y),CV_RGB( 0, 0, 255 ),lineWidth);
-	for (int i = 0; i < ContoursSize; i++)
-	{
-		point.x=Contours[i].x + x;
-		point.y=Contours[i].y + y;
-		cvLine(source,point,point,color,lineWidth);
-	}
+        cv::Point point;
+        int x = Result.x;
+        int y = Result.y;
+        cv::line(source, cv::Point(x , y-5), cv::Point(x, y+5), CV_RGB( 0, 0, 255 ), lineWidth);
+        cv::line(source, cv::Point(x-5 , y), cv::Point(x+5, y), CV_RGB( 0, 0, 255 ), lineWidth);
+        for (int i = 0; i < ContoursSize; i++)
+        {
+                point.x = Contours[i].x + x;
+                point.y = Contours[i].y + y;
+                cv::line(source, point, point, color, lineWidth);
+        }
 }
 
-void DrawContours(IplImage* source, CvPoint* Contours, int ContoursSize, CvScalar color, int lineWidth)
+void DrawContours(cv::Mat& source, CvPoint* Contours, int ContoursSize, cv::Scalar color, int lineWidth)
 {
-	CvPoint point;
-	int x = source->width / 2;
-	int y = source->height / 2;
-	cvLine(source, cvPoint(x , y-5), cvPoint(x, y+5),CV_RGB( 0, 0, 255 ),lineWidth);
-	cvLine(source, cvPoint(x-5 , y), cvPoint(x+5, y),CV_RGB( 0, 0, 255 ),lineWidth);
-	for (int i = 0; i < ContoursSize; i++)
-	{
-		point.x=Contours[i].x ;
-		point.y=Contours[i].y ;
-		cvLine(source,point,point,color,lineWidth);
-	}
+        cv::Point point;
+        int x = source.cols / 2;
+        int y = source.rows / 2;
+        cv::line(source, cv::Point(x , y-5), cv::Point(x, y+5), CV_RGB( 0, 0, 255 ), lineWidth);
+        cv::line(source, cv::Point(x-5 , y), cv::Point(x+5, y), CV_RGB( 0, 0, 255 ), lineWidth);
+        for (int i = 0; i < ContoursSize; i++)
+        {
+                point.x = Contours[i].x;
+                point.y = Contours[i].y;
+                cv::line(source, point, point, color, lineWidth);
+        }
 }
 
 
-int _tmain(int argc, _TCHAR* argv[])
+int main(int argc, char** argv)
 {
-	CShapeMatch SM;
-	IplImage* templateImage = cvLoadImage("..\\TestImage\\Train.bmp", -1 );
-	if (!templateImage)
-	{
-		cout<< " 图片加载失败！\n";
-		system("pause");
-		return 0;
-	}
-	CvSize templateSize = cvSize( templateImage->width, templateImage->height );
-	IplImage* grayTemplateImg = cvCreateImage( templateSize, IPL_DEPTH_8U, 1 );
+        CShapeMatch SM;
+        cv::Mat templateImage = cv::imread("..\\TestImage\\Train.bmp", cv::IMREAD_UNCHANGED);
+        if (templateImage.empty())
+        {
+                cout<< " 图片加载失败！\n";
+                system("pause");
+                return 0;
+        }
+        cv::Size templateSize = templateImage.size();
+        cv::Mat grayTemplateImg(templateSize, CV_8UC1);
 
-	int dim = min(templateImage->width, templateImage->height);  
+        int dim = min(templateImage.cols, templateImage.rows);
 	int numoctaves = (int) (log((double) dim) / log(2.0)) - 2;    //金字塔阶数  
 	numoctaves = min(numoctaves, 7);		//限定金字塔的阶梯数  
 
 	/* Convert color image to gray image. */
-	if(templateImage->nChannels == 3)
-	{
-		cvCvtColor(templateImage, grayTemplateImg, CV_RGB2GRAY);
-	}
-	else
-	{
-		cvCopy(templateImage, grayTemplateImg);
-	}
+        if(templateImage.channels() == 3)
+        {
+                cv::cvtColor(templateImage, grayTemplateImg, cv::COLOR_RGB2GRAY);
+        }
+        else
+        {
+                templateImage.copyTo(grayTemplateImg);
+        }
 
 	/* Set model parameter */
 	shape_model ModelID;
@@ -72,18 +72,22 @@ int _tmain(int argc, _TCHAR* argv[])
 	ModelID.m_MinContrast	= 30;									//低阈值
 	ModelID.m_NumLevels		= 3;										//金字塔级数
 	ModelID.m_Granularity     = 1;									    //颗粒度
-	ModelID.m_ImageWidth   = grayTemplateImg->width;
-	ModelID.m_ImageHeight  = grayTemplateImg->height;
+        ModelID.m_ImageWidth   = grayTemplateImg.cols;
+        ModelID.m_ImageHeight  = grayTemplateImg.rows;
 
-	/* Train shape model and draw contours in  model image.*/
-	edge_list EdgeList;
-	EdgeList.EdgePiont = (CvPoint *) malloc(grayTemplateImg->width * grayTemplateImg->height * sizeof(CvPoint));
-	SM.train_shape_model(grayTemplateImg, ModelID.m_Contrast, ModelID.m_MinContrast, ModelID.m_Granularity, &EdgeList);
-	DrawContours(templateImage, EdgeList.EdgePiont, EdgeList.ListSize , CV_RGB( 255, 0, 0 ),1);
-	cvNamedWindow("Template",CV_WINDOW_AUTOSIZE );
-	cvShowImage("Template",templateImage);
+        /* Train shape model and draw contours in  model image.*/
+        edge_list EdgeList;
+        EdgeList.EdgePiont = (CvPoint *) malloc(grayTemplateImg.cols * grayTemplateImg.rows * sizeof(CvPoint));
+        IplImage* grayTemplateImg_ipl = cvCreateImageHeader(cvSize(grayTemplateImg.cols, grayTemplateImg.rows), grayTemplateImg.depth(), grayTemplateImg.channels());
+        grayTemplateImg_ipl->imageData = reinterpret_cast<char*>(grayTemplateImg.data);
+        grayTemplateImg_ipl->widthStep = grayTemplateImg.step;
+        SM.train_shape_model(grayTemplateImg_ipl, ModelID.m_Contrast, ModelID.m_MinContrast, ModelID.m_Granularity, &EdgeList);
+        cvReleaseImageHeader(&grayTemplateImg_ipl);
+        DrawContours(templateImage, EdgeList.EdgePiont, EdgeList.ListSize , CV_RGB( 255, 0, 0 ),1);
+        cv::namedWindow("Template", cv::WINDOW_AUTOSIZE );
+        cv::imshow("Template", templateImage);
 
-	SM.initial_shape_model(&ModelID, grayTemplateImg->width, grayTemplateImg->height, EdgeList.ListSize);
+        SM.initial_shape_model(&ModelID, grayTemplateImg.cols, grayTemplateImg.rows, EdgeList.ListSize);
 	free(EdgeList.EdgePiont);
 
 	cout<< "\n Search Model Program\n"; 
@@ -91,32 +95,36 @@ int _tmain(int argc, _TCHAR* argv[])
 	cout<< " 角度范围：" <<ModelID.m_AngleStart <<"°~ "<<ModelID.m_AngleStop<<"°\n";
 
 	/* Create shape model file*/
-	clock_t start_time = clock();
- 	bool IsInial = SM.create_shape_model(grayTemplateImg, &ModelID);
-	clock_t finish_time = clock();
+        IplImage* grayTemplateImg_ipl2 = cvCreateImageHeader(cvSize(grayTemplateImg.cols, grayTemplateImg.rows), grayTemplateImg.depth(), grayTemplateImg.channels());
+        grayTemplateImg_ipl2->imageData = reinterpret_cast<char*>(grayTemplateImg.data);
+        grayTemplateImg_ipl2->widthStep = grayTemplateImg.step;
+        clock_t start_time = clock();
+        bool IsInial = SM.create_shape_model(grayTemplateImg_ipl2, &ModelID);
+        cvReleaseImageHeader(&grayTemplateImg_ipl2);
+        clock_t finish_time = clock();
 
 	double total_time = (double)(finish_time-start_time)/CLOCKS_PER_SEC;
 	cout<< " ------------------------------------\n";
 	cout<<" Create Time = "<<total_time*1000<<"ms\n";
 
-	/* Search  model */
-	IplImage* searchImage = cvLoadImage("..\\TestImage\\a.bmp", -1 );
-	if (!searchImage)
-	{
-		cout<< " 图片加载失败！\n";
-		system("pause");
-		return 0;
-	}
-	CvSize searchSize = cvSize( searchImage->width, searchImage->height );
-	IplImage* graySearchImg = cvCreateImage( searchSize, IPL_DEPTH_8U, 1);
+        /* Search  model */
+        cv::Mat searchImage = cv::imread("..\\TestImage\\a.bmp", cv::IMREAD_UNCHANGED);
+        if (searchImage.empty())
+        {
+                cout<< " 图片加载失败！\n";
+                system("pause");
+                return 0;
+        }
+        cv::Size searchSize = searchImage.size();
+        cv::Mat graySearchImg(searchSize, CV_8UC1);
 
 	/* Convert color image to gray image. */ 
-	if(searchImage->nChannels ==3)
-		cvCvtColor(searchImage, graySearchImg, CV_RGB2GRAY);
-	else
-	{
-		cvCopy(searchImage, graySearchImg);
-	}
+        if(searchImage.channels() == 3)
+                cv::cvtColor(searchImage, graySearchImg, cv::COLOR_RGB2GRAY);
+        else
+        {
+                searchImage.copyTo(graySearchImg);
+        }
 
 	/* Set match parameter */
 	int NumMatch		= 4;				//匹配个数
@@ -126,12 +134,16 @@ int _tmain(int argc, _TCHAR* argv[])
 	MatchResultA Result[10];
 	memset(Result, 0, 10 * sizeof(MatchResultA));
 	cout<< " ------------------------------------\n";
-	if(IsInial)
-	{
-		start_time = clock();
-		SM.find_shape_model(graySearchImg, &ModelID, MinScore, NumMatch, Greediness, Result);
-		finish_time = clock();
-	}
+        if(IsInial)
+        {
+                IplImage* graySearchImg_ipl = cvCreateImageHeader(cvSize(graySearchImg.cols, graySearchImg.rows), graySearchImg.depth(), graySearchImg.channels());
+                graySearchImg_ipl->imageData = reinterpret_cast<char*>(graySearchImg.data);
+                graySearchImg_ipl->widthStep = graySearchImg.step;
+                start_time = clock();
+                SM.find_shape_model(graySearchImg_ipl, &ModelID, MinScore, NumMatch, Greediness, Result);
+                finish_time = clock();
+                cvReleaseImageHeader(&graySearchImg_ipl);
+        }
 	else
 		printf(" Create model failed!\n");
 
@@ -159,24 +171,20 @@ int _tmain(int argc, _TCHAR* argv[])
 					break;
 				}
 			}
-			printf(" Location:(%d, %d) Angle: %d Score: %.4f\n", Result[n].CenterLocX, Result[n].CenterLocY, Result[n].Angel, Result[n].ResultScore);
-			DrawContours(searchImage, cvPoint(Result[n].CenterLocX, Result[n].CenterLocY), Contours, count, CV_RGB( 0, 255, 0 ),1);
+                        printf(" Location:(%d, %d) Angle: %d Score: %.4f\n", Result[n].CenterLocX, Result[n].CenterLocY, Result[n].Angel, Result[n].ResultScore);
+                        DrawContours(searchImage, cv::Point(Result[n].CenterLocX, Result[n].CenterLocY), Contours, count, CV_RGB( 0, 255, 0 ),1);
 		}
 	}
 	SM.release_shape_model(&ModelID);
 	
 	//Display result
-	cvNamedWindow("Search Image",CV_WINDOW_AUTOSIZE );
-	cvShowImage("Search Image",searchImage);
+        cv::namedWindow("Search Image", cv::WINDOW_AUTOSIZE );
+        cv::imshow("Search Image", searchImage);
 
 	//Wait for both windows to be closed before releasing images
-	cvWaitKey( 0 );
-	cvDestroyWindow("Search Image");
-	cvDestroyWindow("Template");
-	cvReleaseImage(&graySearchImg);
-	cvReleaseImage(&searchImage);
-	cvReleaseImage(&grayTemplateImg);	
-	cvReleaseImage(&templateImage);
+        cv::waitKey( 0 );
+        cv::destroyWindow("Search Image");
+        cv::destroyWindow("Template");
 
 	return 0;
 }
