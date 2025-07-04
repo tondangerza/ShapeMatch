@@ -6,15 +6,17 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
+#ifdef _WIN32
 #include <vld.h>
+#endif
 #include <time.h>
 
 using namespace std;
 using namespace cv;
 
-#define		MAX_NUM_INSTANCES		300				//×î´óÄ¿±ê¸öÊı
-#define		MIN_NUM_LEVELS				0					//×îĞ¡½ğ×ÖËş¼¶Êı
-#define		MAX_NUM_LEVELS				5					//×î´ó½ğ×ÖËş¼¶Êı
+#define		MAX_NUM_INSTANCES		300				//æœ€å¤§ç›®æ ‡ä¸ªæ•°
+#define		MIN_NUM_LEVELS				0					//æœ€å°é‡‘å­—å¡”çº§æ•°
+#define		MAX_NUM_LEVELS				5					//æœ€å¤§é‡‘å­—å¡”çº§æ•°
 
 const int K_CosineTable[24] =
 {
@@ -24,71 +26,71 @@ const int K_CosineTable[24] =
 	2531, 1981, 1422, 856,   285,   -285
 };
 
-//Æ¥Åä½á¹û½á¹¹Ìå
+//åŒ¹é…ç»“æœç»“æ„ä½“
 struct MatchResultA
 {
-	int 			Angel;						//Æ¥Åä½Ç¶È
-	int 			CenterLocX;				//Æ¥Åä²Î¿¼µãX×ø±ê
-	int			CenterLocY;				//Æ¥Åä²Î¿¼µãY×ø±ê
-	float 		ResultScore;				//Æ¥ÅäµÄ·Ö
+	int 			Angel;						//åŒ¹é…è§’åº¦
+	int 			CenterLocX;				//åŒ¹é…å‚è€ƒç‚¹Xåæ ‡
+	int			CenterLocY;				//åŒ¹é…å‚è€ƒç‚¹Yåæ ‡
+	float 		ResultScore;				//åŒ¹é…çš„åˆ†
 };
 
-//ÌØÕ÷ĞÅÏ¢½á¹¹Ìå
+//ç‰¹å¾ä¿¡æ¯ç»“æ„ä½“
 struct ShapeInfo
 {
-	CvPoint			ReferPoint;					//Ä£°åÖØĞÄ×ø±êRefPoint
-	CvPoint			*Coordinates;				//Ä£°å×ø±êÊı×é
-	float					*EdgeMagnitude;			//Ìİ¶Èµ¼Êı
-	short				*EdgeDerivativeX;			//X·½ÏòÌİ¶È
-	short				*EdgeDerivativeY;			//Y·½ÏòÌİ¶È
-	int 					ImgWidth;					//Í¼Ïñ¿í¶È
-	int					ImgHeight;					//Í¼Ïñ¸ß¶È
-	int					NoOfCordinates;			//ÂÖÀªµã¸öÊı
-	int					Angel;							//Ğı×ª½Ç¶È
-	int					PyLevel;						//½ğ×ÖËş¼¶±ğ
-	int					AngleNum;					//½Ç¶È¸öÊı
+	CvPoint			ReferPoint;					//æ¨¡æ¿é‡å¿ƒåæ ‡RefPoint
+	CvPoint			*Coordinates;				//æ¨¡æ¿åæ ‡æ•°ç»„
+	float					*EdgeMagnitude;			//æ¢¯åº¦å¯¼æ•°
+	short				*EdgeDerivativeX;			//Xæ–¹å‘æ¢¯åº¦
+	short				*EdgeDerivativeY;			//Yæ–¹å‘æ¢¯åº¦
+	int 					ImgWidth;					//å›¾åƒå®½åº¦
+	int					ImgHeight;					//å›¾åƒé«˜åº¦
+	int					NoOfCordinates;			//è½®å»“ç‚¹ä¸ªæ•°
+	int					Angel;							//æ—‹è½¬è§’åº¦
+	int					PyLevel;						//é‡‘å­—å¡”çº§åˆ«
+	int					AngleNum;					//è§’åº¦ä¸ªæ•°
 };
 
-//Ä£°åÎÄ¼ş½á¹¹Ìå
+//æ¨¡æ¿æ–‡ä»¶ç»“æ„ä½“
 struct shape_model
 {
-	int	ID;												//Ä£°åID
-	int 	m_NumLevels;								//½ğ×ÖËş¼¶Êı
-	int 	m_Contrast;									//¸ßãĞÖµ
-	int 	m_MinContrast;							//µÍãĞÖµ
-	int 	m_Granularity;								//±ßÔµ¿ÅÁ£¶È
-	int 	m_AngleStart;								//Ä£°åĞı×ªÆğÊ¼½Ç¶È
-	int 	m_AngleStop;								//Ä£°åĞı×ªÖÕÖ¹·ù¶È
-	int 	m_AngleStep;								//½Ç¶È²½³¤
-	int    m_ImageWidth;							//Ô­Ä£°åÍ¼Ïñ¿í¶È
-	int    m_ImageHeight;							//Ô­Ä£°åÍ¼Ïñ¸ß¶È
-	bool	m_IsInited;									//³õÊ¼»¯±êÖ¾
+	int	ID;												//æ¨¡æ¿ID
+	int 	m_NumLevels;								//é‡‘å­—å¡”çº§æ•°
+	int 	m_Contrast;									//é«˜é˜ˆå€¼
+	int 	m_MinContrast;							//ä½é˜ˆå€¼
+	int 	m_Granularity;								//è¾¹ç¼˜é¢—ç²’åº¦
+	int 	m_AngleStart;								//æ¨¡æ¿æ—‹è½¬èµ·å§‹è§’åº¦
+	int 	m_AngleStop;								//æ¨¡æ¿æ—‹è½¬ç»ˆæ­¢å¹…åº¦
+	int 	m_AngleStep;								//è§’åº¦æ­¥é•¿
+	int    m_ImageWidth;							//åŸæ¨¡æ¿å›¾åƒå®½åº¦
+	int    m_ImageHeight;							//åŸæ¨¡æ¿å›¾åƒé«˜åº¦
+	bool	m_IsInited;									//åˆå§‹åŒ–æ ‡å¿—
 
-	ShapeInfo *m_pShapeInfoPyd1Vec;		//Ä£°å½ğ×ÖËşµÚ1¼¶Í¼ÏñµÄ±ßÔµĞÅÏ¢
-	ShapeInfo *m_pShapeInfoPyd2Vec;		//Ä£°å½ğ×ÖËşµÚ2¼¶Í¼ÏñµÄ±ßÔµĞÅÏ¢
-	ShapeInfo *m_pShapeInfoPyd3Vec;		//Ä£°å½ğ×ÖËşµÚ3¼¶Í¼ÏñµÄ±ßÔµĞÅÏ¢
-	ShapeInfo *m_pShapeInfoTmpVec;		//Ô­Ä£°åÍ¼ÏñµÄ±ßÔµĞÅÏ¢
+	ShapeInfo *m_pShapeInfoPyd1Vec;		//æ¨¡æ¿é‡‘å­—å¡”ç¬¬1çº§å›¾åƒçš„è¾¹ç¼˜ä¿¡æ¯
+	ShapeInfo *m_pShapeInfoPyd2Vec;		//æ¨¡æ¿é‡‘å­—å¡”ç¬¬2çº§å›¾åƒçš„è¾¹ç¼˜ä¿¡æ¯
+	ShapeInfo *m_pShapeInfoPyd3Vec;		//æ¨¡æ¿é‡‘å­—å¡”ç¬¬3çº§å›¾åƒçš„è¾¹ç¼˜ä¿¡æ¯
+	ShapeInfo *m_pShapeInfoTmpVec;		//åŸæ¨¡æ¿å›¾åƒçš„è¾¹ç¼˜ä¿¡æ¯
 };
 
-//ËÑË÷ÇøÓò
+//æœç´¢åŒºåŸŸ
 struct search_region
 {
-	int 	StartX;											//X·½ÏòÆğµã
-	int 	StartY;											//y·½ÏòÆğµã
-	int 	EndX;											//x·½ÏòÖÕµã
-	int 	EndY;											//y·½ÏòÖÕµã
-	int 	AngleRange;									//ËÑË÷½Ç¶ÈÊıÄ¿
-	int    AngleStart;									//ËÑË÷Ô¤ÏÈ½Ç¶È
-	int	AngleStop;									//ËÑË÷ÖÕÖ¹½Ç¶È
-	int    AngleStep;									//ËÑË÷½Ç¶È²½³¤
+	int 	StartX;											//Xæ–¹å‘èµ·ç‚¹
+	int 	StartY;											//yæ–¹å‘èµ·ç‚¹
+	int 	EndX;											//xæ–¹å‘ç»ˆç‚¹
+	int 	EndY;											//yæ–¹å‘ç»ˆç‚¹
+	int 	AngleRange;									//æœç´¢è§’åº¦æ•°ç›®
+	int    AngleStart;									//æœç´¢é¢„å…ˆè§’åº¦
+	int	AngleStop;									//æœç´¢ç»ˆæ­¢è§’åº¦
+	int    AngleStep;									//æœç´¢è§’åº¦æ­¥é•¿
 
 };
 
-//±ß½çµãÁĞ±í
+//è¾¹ç•Œç‚¹åˆ—è¡¨
 struct edge_list
 {
-	CvPoint *EdgePiont;						//±ßÔµ×ø±êÊı×é
-	int 		 ListSize;							//Êı×é´óĞ¡
+	CvPoint *EdgePiont;						//è¾¹ç¼˜åæ ‡æ•°ç»„
+	int 		 ListSize;							//æ•°ç»„å¤§å°
 
 };
 
@@ -100,179 +102,179 @@ public:
 
 	void gaussian_filter(uint8_t* corrupted, uint8_t* smooth, int width, int height);
 		/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºgen_rectangle
-		º¯Êı¹¦ÄÜ£ºÉú³ÉROI
-		ÊäÈë±äÁ¿£ºImage ÊäÈëÍ¼Ïñ, Row1 ×óÉÏ½ÇµãµÄºá×ø±ê, Column1 ×óÉÏ½ÇµãµÄ×İ×ø±ê
-		·µ»Ø±äÁ¿£º
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šgen_rectangle
+		å‡½æ•°åŠŸèƒ½ï¼šç”ŸæˆROI
+		è¾“å…¥å˜é‡ï¼šImage è¾“å…¥å›¾åƒ, Row1 å·¦ä¸Šè§’ç‚¹çš„æ¨ªåæ ‡, Column1 å·¦ä¸Šè§’ç‚¹çš„çºµåæ ‡
+		è¿”å›å˜é‡ï¼š
+		æ³¨é‡Šï¼š		*/
 
 	void gen_rectangle(IplImage *Image, IplImage *ModelRegion, int Row1, int Column1);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºgen_rectangle
-		º¯Êı¹¦ÄÜ£ºÉú³ÉROI
-		ÊäÈë±äÁ¿£ºImage ÊäÈëÍ¼Ïñ, Row1 ×óÉÏ½ÇµãµÄºá×ø±ê, Column1 ×óÉÏ½ÇµãµÄ×İ×ø±ê
-		·µ»Ø±äÁ¿£º
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šgen_rectangle
+		å‡½æ•°åŠŸèƒ½ï¼šç”ŸæˆROI
+		è¾“å…¥å˜é‡ï¼šImage è¾“å…¥å›¾åƒ, Row1 å·¦ä¸Šè§’ç‚¹çš„æ¨ªåæ ‡, Column1 å·¦ä¸Šè§’ç‚¹çš„çºµåæ ‡
+		è¿”å›å˜é‡ï¼š
+		æ³¨é‡Šï¼š		*/
 
 	void board_image(IplImage *SrcImg, IplImage *ImgBordered, int32_t xOffset, int32_t yOffset);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºboard_image
-		º¯Êı¹¦ÄÜ£ºÍ¼Ïñ±ß½çÀ©Õ¹
-		ÊäÈë±äÁ¿£ºSrcImage ÊäÈëÍ¼Ïñ, DstImage Êä³öÍ¼Ïñ
-		·µ»Ø±äÁ¿£º
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šboard_image
+		å‡½æ•°åŠŸèƒ½ï¼šå›¾åƒè¾¹ç•Œæ‰©å±•
+		è¾“å…¥å˜é‡ï¼šSrcImage è¾“å…¥å›¾åƒ, DstImage è¾“å‡ºå›¾åƒ
+		è¿”å›å˜é‡ï¼š
+		æ³¨é‡Šï¼š		*/
 
 	void rotate_image (uint8_t *SrcImgData, uint8_t *MaskImgData, int srcWidth, int srcHeight, uint8_t *DstImgData, uint8_t *MaskRotData, int dstWidth, int dstHeight, int Angle);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºrotate_image
-		º¯Êı¹¦ÄÜ£ºÍ¼ÏñĞı×ªº¯Êı
-		ÊäÈë±äÁ¿£ºSrcImage ÊäÈëÍ¼Ïñ, DstImage Êä³öÍ¼Ïñ, AngleĞı×ª½Ç¶È
-		·µ»Ø±äÁ¿£ºDstImgData Ğı×ªºóµÄÍ¼Ïñ
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šrotate_image
+		å‡½æ•°åŠŸèƒ½ï¼šå›¾åƒæ—‹è½¬å‡½æ•°
+		è¾“å…¥å˜é‡ï¼šSrcImage è¾“å…¥å›¾åƒ, DstImage è¾“å‡ºå›¾åƒ, Angleæ—‹è½¬è§’åº¦
+		è¿”å›å˜é‡ï¼šDstImgData æ—‹è½¬åçš„å›¾åƒ
+		æ³¨é‡Šï¼š		*/
 
 	void rotateImage (IplImage* srcImage, IplImage* dstImage, int Angle);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºrotate_image
-		º¯Êı¹¦ÄÜ£ºÍ¼ÏñĞı×ªº¯Êı
-		ÊäÈë±äÁ¿£ºSrcImage ÊäÈëÍ¼Ïñ, DstImage Êä³öÍ¼Ïñ, AngleĞı×ª½Ç¶È
-		·µ»Ø±äÁ¿£ºDstImgData Ğı×ªºóµÄÍ¼Ïñ
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šrotate_image
+		å‡½æ•°åŠŸèƒ½ï¼šå›¾åƒæ—‹è½¬å‡½æ•°
+		è¾“å…¥å˜é‡ï¼šSrcImage è¾“å…¥å›¾åƒ, DstImage è¾“å‡ºå›¾åƒ, Angleæ—‹è½¬è§’åº¦
+		è¿”å›å˜é‡ï¼šDstImgData æ—‹è½¬åçš„å›¾åƒ
+		æ³¨é‡Šï¼š		*/
 
 	void image_pyramid(uint8_t *SrcImgData,  int srcWidth, int srcHeight, uint8_t *OutImgData);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºimagePyramid
-		º¯Êı¹¦ÄÜ£ºÍ¼Ïñ½ğ×ÖËşº¯Êı 2*2²ÉÑù
-		ÊäÈë±äÁ¿£ºSrcImage ÊäÈëÍ¼Ïñ, srcWidth Í¼Ïñ¿í¶È£¬ srcHeight Í¼Ïñ¸ß¶È
-		·µ»Ø±äÁ¿£ºOutImageData ½ğ×ÖËşÍ¼Ïñ
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šimagePyramid
+		å‡½æ•°åŠŸèƒ½ï¼šå›¾åƒé‡‘å­—å¡”å‡½æ•° 2*2é‡‡æ ·
+		è¾“å…¥å˜é‡ï¼šSrcImage è¾“å…¥å›¾åƒ, srcWidth å›¾åƒå®½åº¦ï¼Œ srcHeight å›¾åƒé«˜åº¦
+		è¿”å›å˜é‡ï¼šOutImageData é‡‘å­—å¡”å›¾åƒ
+		æ³¨é‡Šï¼š		*/
 
 	void imagePyramid(uint8_t *SrcImgData,  int srcWidth, int srcHeight, uint8_t *OutImgData);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºimagePyramid
-		º¯Êı¹¦ÄÜ£ºÍ¼Ïñ½ğ×ÖËşº¯Êı Ë«ÏßĞÔ²åÖµ
-		ÊäÈë±äÁ¿£ºSrcImage ÊäÈëÍ¼Ïñ, srcWidth Í¼Ïñ¿í¶È£¬ srcHeight Í¼Ïñ¸ß¶È
-		·µ»Ø±äÁ¿£ºOutImageData ½ğ×ÖËşÍ¼Ïñ
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šimagePyramid
+		å‡½æ•°åŠŸèƒ½ï¼šå›¾åƒé‡‘å­—å¡”å‡½æ•° åŒçº¿æ€§æ’å€¼
+		è¾“å…¥å˜é‡ï¼šSrcImage è¾“å…¥å›¾åƒ, srcWidth å›¾åƒå®½åº¦ï¼Œ srcHeight å›¾åƒé«˜åº¦
+		è¿”å›å˜é‡ï¼šOutImageData é‡‘å­—å¡”å›¾åƒ
+		æ³¨é‡Šï¼š		*/
 
 	void initial_shape_model(shape_model *ModelID, int Width, int Height, int EdgeSize);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºinitial_shape_model
-		º¯Êı¹¦ÄÜ£º³õÊ¼»¯Ä£°æ×ÊÔ´
-		ÊäÈë±äÁ¿£ºModelID Ä£°åÎÄ¼ş
-		·µ»Ø±äÁ¿£º
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šinitial_shape_model
+		å‡½æ•°åŠŸèƒ½ï¼šåˆå§‹åŒ–æ¨¡ç‰ˆèµ„æº
+		è¾“å…¥å˜é‡ï¼šModelID æ¨¡æ¿æ–‡ä»¶
+		è¿”å›å˜é‡ï¼š
+		æ³¨é‡Šï¼š		*/
 
 	bool release_shape_model(shape_model *ModelID);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºrelease_shape_model
-		º¯Êı¹¦ÄÜ£ºÊÍ·ÅÄ£°æ×ÊÔ´
-		ÊäÈë±äÁ¿£ºModelID Ä£°åÎÄ¼ş
-		·µ»Ø±äÁ¿£º
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šrelease_shape_model
+		å‡½æ•°åŠŸèƒ½ï¼šé‡Šæ”¾æ¨¡ç‰ˆèµ„æº
+		è¾“å…¥å˜é‡ï¼šModelID æ¨¡æ¿æ–‡ä»¶
+		è¿”å›å˜é‡ï¼š
+		æ³¨é‡Šï¼š		*/
 
 	void extract_shape_info(uint8_t *ImageData, ShapeInfo *ShapeInfoData, int Contrast, int MinContrast, int PointReduction, uint8_t *MaskImgData);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºextract_shape_info
-		º¯Êı¹¦ÄÜ£ºÌáÈ¡ĞÎ×´ĞÅÏ¢
-		ÊäÈë±äÁ¿£ºImageData Í¼ÏñÊı¾İ, MinContrast ×îĞ¡ãĞÖµ, Contrast ãĞÖµ
-		·µ»Ø±äÁ¿£ºshape_info ĞÎ×´ĞÅÏ¢
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šextract_shape_info
+		å‡½æ•°åŠŸèƒ½ï¼šæå–å½¢çŠ¶ä¿¡æ¯
+		è¾“å…¥å˜é‡ï¼šImageData å›¾åƒæ•°æ®, MinContrast æœ€å°é˜ˆå€¼, Contrast é˜ˆå€¼
+		è¿”å›å˜é‡ï¼šshape_info å½¢çŠ¶ä¿¡æ¯
+		æ³¨é‡Šï¼š		*/
 
 	bool build_model_list(ShapeInfo *ShapeInfoVec, uint8_t *ImageData, uint8_t *MaskData, int Width, int Height, int Contrast, int MinContrast, int Granularity);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºbuild_model_list
-		º¯Êı¹¦ÄÜ£º´´½¨½Ç¶ÈÄ£°åĞòÁĞ
-		ÊäÈë±äÁ¿£ºShapeInfoVec ĞòÁĞÖ¸Õë, MinContrast ×îĞ¡ãĞÖµ, Contrast ãĞÖµ, Graininess ±ßÔµ¿ÅÁ£¶È
-		·µ»Ø±äÁ¿£ºModelID Ä£°åÎÄ¼ş
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šbuild_model_list
+		å‡½æ•°åŠŸèƒ½ï¼šåˆ›å»ºè§’åº¦æ¨¡æ¿åºåˆ—
+		è¾“å…¥å˜é‡ï¼šShapeInfoVec åºåˆ—æŒ‡é’ˆ, MinContrast æœ€å°é˜ˆå€¼, Contrast é˜ˆå€¼, Graininess è¾¹ç¼˜é¢—ç²’åº¦
+		è¿”å›å˜é‡ï¼šModelID æ¨¡æ¿æ–‡ä»¶
+		æ³¨é‡Šï¼š		*/
 
 	void train_shape_model(IplImage *Image, int Contrast, int MinContrast, int PointReduction, edge_list *EdgeList);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºtrain_shape_model
-		º¯Êı¹¦ÄÜ£ºÑµÁ·ĞÎ×´Ä£°å
-		ÊäÈë±äÁ¿£ºImage ÊäÈëÍ¼Ïñ, MinContrast ×îĞ¡ãĞÖµ, Contrast ãĞÖµ
-		·µ»Ø±äÁ¿£ºEdgeList ±ßÔµµãĞòÁĞ
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼štrain_shape_model
+		å‡½æ•°åŠŸèƒ½ï¼šè®­ç»ƒå½¢çŠ¶æ¨¡æ¿
+		è¾“å…¥å˜é‡ï¼šImage è¾“å…¥å›¾åƒ, MinContrast æœ€å°é˜ˆå€¼, Contrast é˜ˆå€¼
+		è¿”å›å˜é‡ï¼šEdgeList è¾¹ç¼˜ç‚¹åºåˆ—
+		æ³¨é‡Šï¼š		*/
 
 	bool create_shape_model(IplImage *Template, shape_model *ModelID);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºcreate_shape_model
-		º¯Êı¹¦ÄÜ£º´´½¨Æ¥ÅäÄ£°å
-		ÊäÈë±äÁ¿£ºTemplate Ä£°åÍ¼Ïñ, NumLevels ½ğ×ÖËş¼¶Êı, AngleStart ÆğÊ¼½Ç¶È, AngleExtent ½Ç¶È·¶Î§, AngleStep ½Ç¶È²½³¤, PointReduction ±ßÔµµãËõ¼õÒò×Ó, Contrast
-		·µ»Ø±äÁ¿£ºModelID Ä£°åÎÄ¼ş
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šcreate_shape_model
+		å‡½æ•°åŠŸèƒ½ï¼šåˆ›å»ºåŒ¹é…æ¨¡æ¿
+		è¾“å…¥å˜é‡ï¼šTemplate æ¨¡æ¿å›¾åƒ, NumLevels é‡‘å­—å¡”çº§æ•°, AngleStart èµ·å§‹è§’åº¦, AngleExtent è§’åº¦èŒƒå›´, AngleStep è§’åº¦æ­¥é•¿, PointReduction è¾¹ç¼˜ç‚¹ç¼©å‡å› å­, Contrast
+		è¿”å›å˜é‡ï¼šModelID æ¨¡æ¿æ–‡ä»¶
+		æ³¨é‡Šï¼š		*/
 
 	void shape_match(uint8_t *SearchImage, ShapeInfo *ShapeInfoVec, int Width, int Height, int *NumMatches, int Contrast, int MinContrast, float MinScore, float Greediness, search_region *SearchRegion, MatchResultA *ResultList);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºshape_match
-		º¯Êı¹¦ÄÜ£ºĞÎ×´Æ¥Åäº¯Êı
-		ÊäÈë±äÁ¿£ºSearchImage ´ıËÑË÷Í¼ÏñÊı¾İ,  ShapeInfo Ä£°åĞÎ×´ĞÅÏ¢, Width Í¼Ïñ¿í¶È, Height Í¼Ïñ¸ß¶È, NumMatches Æ¥ÅäÄ¿±êÊı MinScore ×îĞ¡ÆÀ·Ö, Greediness Ì°À·¶È, SearchRegion ËÑË÷·¶Î§
-		·µ»Ø±äÁ¿£ºResultList Æ¥Åä½á¹û
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šshape_match
+		å‡½æ•°åŠŸèƒ½ï¼šå½¢çŠ¶åŒ¹é…å‡½æ•°
+		è¾“å…¥å˜é‡ï¼šSearchImage å¾…æœç´¢å›¾åƒæ•°æ®,  ShapeInfo æ¨¡æ¿å½¢çŠ¶ä¿¡æ¯, Width å›¾åƒå®½åº¦, Height å›¾åƒé«˜åº¦, NumMatches åŒ¹é…ç›®æ ‡æ•° MinScore æœ€å°è¯„åˆ†, Greediness è´ªå©ªåº¦, SearchRegion æœç´¢èŒƒå›´
+		è¿”å›å˜é‡ï¼šResultList åŒ¹é…ç»“æœ
+		æ³¨é‡Šï¼š		*/
 	
 	void shape_match_accurate(uint8_t *SearchImage, ShapeInfo *ShapeInfoVec, int Width, int Height, int Contrast, int MinContrast, float MinScore, float Greediness, search_region *SearchRegion, MatchResultA *ResultList);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºshape_match_accurate
-		º¯Êı¹¦ÄÜ£º¾«È·ĞÎ×´Æ¥Åäº¯Êı
-		ÊäÈë±äÁ¿£ºSearchImage ´ıËÑË÷Í¼ÏñÊı¾İ,  ShapeInfo Ä£°åĞÎ×´ĞÅÏ¢, Width Í¼Ïñ¿í¶È, Height Í¼Ïñ¸ß¶È, NumMatches Æ¥ÅäÄ¿±êÊı MinScore ×îĞ¡ÆÀ·Ö, Greediness Ì°À·¶È, SearchRegion ËÑË÷·¶Î§
-		·µ»Ø±äÁ¿£ºResultList Æ¥Åä½á¹û
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šshape_match_accurate
+		å‡½æ•°åŠŸèƒ½ï¼šç²¾ç¡®å½¢çŠ¶åŒ¹é…å‡½æ•°
+		è¾“å…¥å˜é‡ï¼šSearchImage å¾…æœç´¢å›¾åƒæ•°æ®,  ShapeInfo æ¨¡æ¿å½¢çŠ¶ä¿¡æ¯, Width å›¾åƒå®½åº¦, Height å›¾åƒé«˜åº¦, NumMatches åŒ¹é…ç›®æ ‡æ•° MinScore æœ€å°è¯„åˆ†, Greediness è´ªå©ªåº¦, SearchRegion æœç´¢èŒƒå›´
+		è¿”å›å˜é‡ï¼šResultList åŒ¹é…ç»“æœ
+		æ³¨é‡Šï¼š		*/
 
 	void find_shape_model(IplImage *Image, shape_model *ModelID, float MinScore, int NumMatches, float Greediness, MatchResultA *ResultList);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºfind_shape_model
-		º¯Êı¹¦ÄÜ£ºÔÚËÑË÷Í¼ÖĞÑ°ÕÒÄ£°åÄ¿±ê
-		ÊäÈë±äÁ¿£ºImage ´ıËÑË÷Í¼Ïñ,  ModelID Ä£°åÎÄ¼ş, AngleStart ÆğÊ¼½Ç¶È, AngleExtent ½Ç¶È·¶Î§, MinScore ×îĞ¡ÆÀ·Ö, NumMatches Æ¥ÅäÄ¿±êÊı
-		·µ»Ø±äÁ¿£ºRow Æ¥Åä²Î¿¼µãµãX×ø±ê, Column Æ¥Åä²Î¿¼µãµãY×ø±ê, Angle Ä¿±êĞı×ª½Ç¶È, Score ÆÀ·Ö
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šfind_shape_model
+		å‡½æ•°åŠŸèƒ½ï¼šåœ¨æœç´¢å›¾ä¸­å¯»æ‰¾æ¨¡æ¿ç›®æ ‡
+		è¾“å…¥å˜é‡ï¼šImage å¾…æœç´¢å›¾åƒ,  ModelID æ¨¡æ¿æ–‡ä»¶, AngleStart èµ·å§‹è§’åº¦, AngleExtent è§’åº¦èŒƒå›´, MinScore æœ€å°è¯„åˆ†, NumMatches åŒ¹é…ç›®æ ‡æ•°
+		è¿”å›å˜é‡ï¼šRow åŒ¹é…å‚è€ƒç‚¹ç‚¹Xåæ ‡, Column åŒ¹é…å‚è€ƒç‚¹ç‚¹Yåæ ‡, Angle ç›®æ ‡æ—‹è½¬è§’åº¦, Score è¯„åˆ†
+		æ³¨é‡Šï¼š		*/
 
 	int  ShiftCos(int y);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºShiftCos
-		º¯Êı¹¦ÄÜ£ºÓàÏÒÈı½Çº¯Êı
-		ÊäÈë±äÁ¿£ºy ½Ç¶È
-		·µ»Ø±äÁ¿£ºÓàÏÒÖµ
+	/*	å‡½æ•°åï¼šShiftCos
+		å‡½æ•°åŠŸèƒ½ï¼šä½™å¼¦ä¸‰è§’å‡½æ•°
+		è¾“å…¥å˜é‡ï¼šy è§’åº¦
+		è¿”å›å˜é‡ï¼šä½™å¼¦å€¼
 
-		×¢ÊÍ£º		*/
+		æ³¨é‡Šï¼š		*/
 
 	int  ShiftSin(int y);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºShiftSin
-		º¯Êı¹¦ÄÜ£ºÕıÏÒÈı½Çº¯Êı
-		ÊäÈë±äÁ¿£ºy ½Ç¶È
-		·µ»Ø±äÁ¿£ºÕıÏÒÖµ
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šShiftSin
+		å‡½æ•°åŠŸèƒ½ï¼šæ­£å¼¦ä¸‰è§’å‡½æ•°
+		è¾“å…¥å˜é‡ï¼šy è§’åº¦
+		è¿”å›å˜é‡ï¼šæ­£å¼¦å€¼
+		æ³¨é‡Šï¼š		*/
 
 	float Q_rsqrt( float number );
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºQ_rsqrt
-		º¯Êı¹¦ÄÜ£ºÇó½âÆ½·½¸ùµ¹Êı
-		ÊäÈë±äÁ¿£ºnumber
-		·µ»Ø±äÁ¿£ºÆ½·½¸ùµ¹Êı
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šQ_rsqrt
+		å‡½æ•°åŠŸèƒ½ï¼šæ±‚è§£å¹³æ–¹æ ¹å€’æ•°
+		è¾“å…¥å˜é‡ï¼šnumber
+		è¿”å›å˜é‡ï¼šå¹³æ–¹æ ¹å€’æ•°
+		æ³¨é‡Šï¼š		*/
 
 	float new_rsqrt(float f);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºnew_rsqrt
-		º¯Êı¹¦ÄÜ£ºÇó½âÆ½·½¸ùµ¹Êı
-		ÊäÈë±äÁ¿£ºf
-		·µ»Ø±äÁ¿£ºÆ½·½¸ùµ¹Êı
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šnew_rsqrt
+		å‡½æ•°åŠŸèƒ½ï¼šæ±‚è§£å¹³æ–¹æ ¹å€’æ•°
+		è¾“å…¥å˜é‡ï¼šf
+		è¿”å›å˜é‡ï¼šå¹³æ–¹æ ¹å€’æ•°
+		æ³¨é‡Šï¼š		*/
 
 	void QuickSort(MatchResultA *s, int l, int r);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºQuickSort
-		º¯Êı¹¦ÄÜ£ºÊı×éÅÅĞò
-		ÊäÈë±äÁ¿£ºs[] ½á¹ûÊı×é£¬
-		·µ»Ø±äÁ¿£º
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šQuickSort
+		å‡½æ•°åŠŸèƒ½ï¼šæ•°ç»„æ’åº
+		è¾“å…¥å˜é‡ï¼šs[] ç»“æœæ•°ç»„ï¼Œ
+		è¿”å›å˜é‡ï¼š
+		æ³¨é‡Šï¼š		*/
 
 	int ConvertLength(int LengthSrc);
 	/*--------------------------------------------------------------------------------------------*/
-	/*	º¯ÊıÃû£ºConvertLength
-		º¯Êı¹¦ÄÜ£º³¤¶È×ª»»
-		ÊäÈë±äÁ¿£ºLengthSrc ´ı×ª»»³¤¶È£¬
-		·µ»Ø±äÁ¿£º×ª»»½á¹û
-		×¢ÊÍ£º		*/
+	/*	å‡½æ•°åï¼šConvertLength
+		å‡½æ•°åŠŸèƒ½ï¼šé•¿åº¦è½¬æ¢
+		è¾“å…¥å˜é‡ï¼šLengthSrc å¾…è½¬æ¢é•¿åº¦ï¼Œ
+		è¿”å›å˜é‡ï¼šè½¬æ¢ç»“æœ
+		æ³¨é‡Šï¼š		*/
 };
 
