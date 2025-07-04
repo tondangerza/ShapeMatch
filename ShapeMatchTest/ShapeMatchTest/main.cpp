@@ -39,7 +39,7 @@ void DrawContours(cv::Mat& source, CvPoint* Contours, int ContoursSize, cv::Scal
 int main(int argc, char** argv)
 {
         CShapeMatch SM;
-        cv::Mat templateImage = cv::imread("..\\TestImage\\Train.bmp", cv::IMREAD_UNCHANGED);
+        cv::Mat templateImage = cv::imread("ShapeMatchTest/TestImage/1.bmp", cv::IMREAD_UNCHANGED);
         if (templateImage.empty())
         {
                 cout<< " 图片加载失败！\n";
@@ -78,14 +78,15 @@ int main(int argc, char** argv)
         /* Train shape model and draw contours in  model image.*/
         edge_list EdgeList;
         EdgeList.EdgePiont = (CvPoint *) malloc(grayTemplateImg.cols * grayTemplateImg.rows * sizeof(CvPoint));
-        IplImage* grayTemplateImg_ipl = cvCreateImageHeader(cvSize(grayTemplateImg.cols, grayTemplateImg.rows), grayTemplateImg.depth(), grayTemplateImg.channels());
+        IplImage* grayTemplateImg_ipl = cvCreateImageHeader(cvSize(grayTemplateImg.cols, grayTemplateImg.rows), IPL_DEPTH_8U, grayTemplateImg.channels());
         grayTemplateImg_ipl->imageData = reinterpret_cast<char*>(grayTemplateImg.data);
         grayTemplateImg_ipl->widthStep = grayTemplateImg.step;
         SM.train_shape_model(grayTemplateImg_ipl, ModelID.m_Contrast, ModelID.m_MinContrast, ModelID.m_Granularity, &EdgeList);
         cvReleaseImageHeader(&grayTemplateImg_ipl);
         DrawContours(templateImage, EdgeList.EdgePiont, EdgeList.ListSize , CV_RGB( 255, 0, 0 ),1);
-        cv::namedWindow("Template", cv::WINDOW_AUTOSIZE );
-        cv::imshow("Template", templateImage);
+        // Removed GUI window for headless execution
+        // cv::namedWindow("Template", cv::WINDOW_AUTOSIZE );
+        // cv::imshow("Template", templateImage);
 
         SM.initial_shape_model(&ModelID, grayTemplateImg.cols, grayTemplateImg.rows, EdgeList.ListSize);
 	free(EdgeList.EdgePiont);
@@ -95,7 +96,7 @@ int main(int argc, char** argv)
 	cout<< " 角度范围：" <<ModelID.m_AngleStart <<"°~ "<<ModelID.m_AngleStop<<"°\n";
 
 	/* Create shape model file*/
-        IplImage* grayTemplateImg_ipl2 = cvCreateImageHeader(cvSize(grayTemplateImg.cols, grayTemplateImg.rows), grayTemplateImg.depth(), grayTemplateImg.channels());
+        IplImage* grayTemplateImg_ipl2 = cvCreateImageHeader(cvSize(grayTemplateImg.cols, grayTemplateImg.rows), IPL_DEPTH_8U, grayTemplateImg.channels());
         grayTemplateImg_ipl2->imageData = reinterpret_cast<char*>(grayTemplateImg.data);
         grayTemplateImg_ipl2->widthStep = grayTemplateImg.step;
         clock_t start_time = clock();
@@ -108,7 +109,7 @@ int main(int argc, char** argv)
 	cout<<" Create Time = "<<total_time*1000<<"ms\n";
 
         /* Search  model */
-        cv::Mat searchImage = cv::imread("..\\TestImage\\a.bmp", cv::IMREAD_UNCHANGED);
+        cv::Mat searchImage = cv::imread("ShapeMatchTest/TestImage/a.bmp", cv::IMREAD_UNCHANGED);
         if (searchImage.empty())
         {
                 cout<< " 图片加载失败！\n";
@@ -136,7 +137,7 @@ int main(int argc, char** argv)
 	cout<< " ------------------------------------\n";
         if(IsInial)
         {
-                IplImage* graySearchImg_ipl = cvCreateImageHeader(cvSize(graySearchImg.cols, graySearchImg.rows), graySearchImg.depth(), graySearchImg.channels());
+                IplImage* graySearchImg_ipl = cvCreateImageHeader(cvSize(graySearchImg.cols, graySearchImg.rows), IPL_DEPTH_8U, graySearchImg.channels());
                 graySearchImg_ipl->imageData = reinterpret_cast<char*>(graySearchImg.data);
                 graySearchImg_ipl->widthStep = graySearchImg.step;
                 start_time = clock();
@@ -178,13 +179,14 @@ int main(int argc, char** argv)
 	SM.release_shape_model(&ModelID);
 	
 	//Display result
-        cv::namedWindow("Search Image", cv::WINDOW_AUTOSIZE );
-        cv::imshow("Search Image", searchImage);
+        // Removed GUI window for headless execution
+        // cv::namedWindow("Search Image", cv::WINDOW_AUTOSIZE );
+        // cv::imshow("Search Image", searchImage);
 
-	//Wait for both windows to be closed before releasing images
-        cv::waitKey( 0 );
-        cv::destroyWindow("Search Image");
-        cv::destroyWindow("Template");
+        // Wait and cleanup removed for no-window mode
+        // cv::waitKey( 0 );
+        // cv::destroyWindow("Search Image");
+        // cv::destroyWindow("Template");
 
 	return 0;
 }
